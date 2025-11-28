@@ -1,0 +1,11 @@
+{
+  "name": "Cube Activity",
+  "domain": "your-domain.com",
+  "release": "1.0"
+    "localizations": {
+      "en-US": {
+        "name": "Pythons ROOM"
+      }
+    }
+  }
+}
