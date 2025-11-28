@@ -1,14 +1,28 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Cube Activity</title>
-  <script src="https://embed.discordapp.net/sdk/1.0/discord-embedded-app-sdk.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* optional: reset margin/body to avoid scrollbars in embed */
+    body { margin: 0; overflow: hidden; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      background: rgba(0,0,0,0.5);
+      padding: 8px;
+      border-radius: 4px;
+      color: white;
+      font-family: sans-serif;
+    }
+    #coords {
+      margin-top: 8px;
+      color: #fff;
+    }
+  </style>
 </head>
-
 <body>
   <div id="ui">
     <label>Color:</label>
@@ -16,9 +30,27 @@
     <div id="coords">x:0 y:0 z:0</div>
   </div>
 
-  <script>
+  <script type="module">
+    import { DiscordSDK } from "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@latest/+esm";
+
     const APP_ID = "1444052119794487326";
+    const discord = new DiscordSDK(APP_ID);
+
+    async function initDiscord() {
+      await discord.ready();
+      console.log("Discord SDK ready");
+      // You can perform further setup here if needed
+      startGame();
+    }
+
+    initDiscord().catch(err => {
+      console.error("Failed to initialize Discord SDK:", err);
+    });
   </script>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
+
