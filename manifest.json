@@ -1,11 +1,17 @@
 {
-  "name": "Cube Activity",
-  "domain": "your-domain.com",
-  "release": "1.0"
+  "name": "Pythons Room",
+  "domain": "teddy11235-evil.github.io",
+  "release": {
     "localizations": {
       "en-US": {
-        "name": "Pythons ROOM"
+        "name": "Pythons Room"
       }
     }
+  },
+  "activity": {
+    "preview": {
+      "launch_url": "https://teddy11235-evil.github.io/Pythons-room/"
+    },
+    "supported_platforms": ["desktop", "web"]
   }
 }
