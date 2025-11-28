@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <title>Cube Activity</title>
   <style>
-    /* optional: reset margin/body to avoid scrollbars in embed */
-    body { margin: 0; overflow: hidden; }
+    body { margin: 0; overflow: hidden; cursor: none; }
     #ui {
       position: absolute;
       top: 10px;
@@ -39,18 +38,20 @@
     async function initDiscord() {
       await discord.ready();
       console.log("Discord SDK ready");
-      // You can perform further setup here if needed
-      startGame();
+      startGame(discord);
     }
 
-    initDiscord().catch(err => {
-      console.error("Failed to initialize Discord SDK:", err);
+    initDiscord().catch(err => console.error("Failed to initialize Discord SDK:", err));
+
+    // Pointer lock for mouse
+    document.body.addEventListener('click', () => {
+      document.body.requestPointerLock();
     });
   </script>
 
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="main.js"></script>
+  <script src="main.js" type="module"></script>
 </body>
 </html>
+
 
