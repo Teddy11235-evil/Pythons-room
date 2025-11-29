@@ -17,6 +17,15 @@ let mouseX = 0, mouseY = 0;
 let cameraDistance = 10;
 let authUser = { id: "local", username: "Player" };
 
+// Physics
+const GRAVITY = -0.02;
+const JUMP_FORCE = 0.25;
+const MOVE_SPEED = 0.12;
+const FRICTION = 0.9;
+
+// Collision objects
+const collisionObjects = [];
+
 // Loading progress
 let loadingProgress = 0;
 
@@ -123,7 +132,7 @@ async function initGame() {
   // Camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   
-  // Renderer
+  // Renderer with better shadows
   renderer = new THREE.WebGLRenderer({ 
     antialias: true,
     alpha: false
@@ -132,6 +141,7 @@ async function initGame() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = true;
   
   // Clear any existing canvas
   const existingCanvas = document.querySelector('canvas');
@@ -144,7 +154,25 @@ async function initGame() {
   renderer.domElement.tabIndex = 1;
   renderer.domElement.style.outline = 'none';
   
-  // Ground
+  // Enhanced lighting for better shadows
+  const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+  scene.add(ambientLight);
+  
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(50, 100, 50);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.width = 2048;
+  directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.near = 0.5;
+  directionalLight.shadow.camera.far = 500;
+  directionalLight.shadow.camera.left = -100;
+  directionalLight.shadow.camera.right = 100;
+  directionalLight.shadow.camera.top = 100;
+  directionalLight.shadow.camera.bottom = -100;
+  directionalLight.shadow.bias = -0.001;
+  scene.add(directionalLight);
+  
+  // Ground with shadows
   const groundGeometry = new THREE.PlaneGeometry(200, 200);
   const groundMaterial = new THREE.MeshStandardMaterial({ 
     color: 0x3a7e3a,
@@ -154,6 +182,12 @@ async function initGame() {
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+  collisionObjects.push({ object: ground, isGround: true });
+  
+  // Welcome platform at spawn
+  const platform = createWelcomePlatform();
+  scene.add(platform);
+  collisionObjects.push({ object: platform, isGround: true });
   
   // Grid helper
   const gridHelper = new THREE.GridHelper(200, 50, 0x000000, 0x000000);
@@ -161,26 +195,17 @@ async function initGame() {
   gridHelper.material.transparent = true;
   scene.add(gridHelper);
   
-  // Lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-  
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(50, 100, 50);
-  directionalLight.castShadow = true;
-  scene.add(directionalLight);
-  
-  // Create player
+  // Create player with shadows
   localCube = createCube("#00ffea");
   localCube.castShadow = true;
-  localCube.position.set(0, 1, 0);
+  localCube.position.set(0, 2, 0); // Start on platform
   scene.add(localCube);
   
   // Player label
   localLabel = createTextLabel(authUser.username);
   scene.add(localLabel);
   
-  // Add environment
+  // Add environment with shadows
   createEnvironment();
   
   console.log("Game initialized successfully");
@@ -192,10 +217,56 @@ async function initGame() {
   window.addEventListener('resize', onWindowResize);
 }
 
+function createWelcomePlatform() {
+  // Create a 4x4x0.1 platform
+  const platformGeometry = new THREE.BoxGeometry(4, 0.1, 4);
+  const platformMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0x8888ff,
+    roughness: 0.3,
+    metalness: 0.2
+  });
+  const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+  platform.position.set(0, 0.05, 0); // Slightly above ground
+  platform.receiveShadow = true;
+  platform.castShadow = true;
+  
+  // Add "WELCOME" text on the platform
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  canvas.width = 512;
+  canvas.height = 128;
+  
+  context.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  
+  context.font = 'bold 60px Arial';
+  context.fillStyle = '#3333ff';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText('WELCOME', canvas.width / 2, canvas.height / 2);
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  const textMaterial = new THREE.MeshStandardMaterial({
+    map: texture,
+    transparent: true
+  });
+  
+  const textPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.5, 0.8),
+    textMaterial
+  );
+  textPlane.rotation.x = -Math.PI / 2;
+  textPlane.position.set(0, 0.11, 0);
+  platform.add(textPlane);
+  
+  return platform;
+}
+
 function createEnvironment() {
-  // Add some trees
+  // Add some trees with shadows
   const treePositions = [
-    [10, 0, 10], [-10, 0, 15], [15, 0, -8], [-12, 0, -10]
+    [10, 0, 10], [-10, 0, 15], [15, 0, -8], [-12, 0, -10],
+    [8, 0, 18], [-15, 0, -5], [12, 0, -12], [-8, 0, 20]
   ];
   
   treePositions.forEach(([x, y, z]) => {
@@ -205,7 +276,16 @@ function createEnvironment() {
     );
     treeTrunk.position.set(x, 1, z);
     treeTrunk.castShadow = true;
+    treeTrunk.receiveShadow = true;
     scene.add(treeTrunk);
+    
+    // Add to collision objects
+    collisionObjects.push({
+      object: treeTrunk,
+      radius: 0.4,
+      height: 2,
+      type: 'cylinder'
+    });
     
     const treeTop = new THREE.Mesh(
       new THREE.SphereGeometry(1.5, 8, 6),
@@ -213,7 +293,32 @@ function createEnvironment() {
     );
     treeTop.position.set(x, 3, z);
     treeTop.castShadow = true;
+    treeTop.receiveShadow = true;
     scene.add(treeTop);
+  });
+  
+  // Add some boxes for collision testing
+  const boxPositions = [
+    [5, 0.5, 5], [-5, 0.5, -5], [7, 0.5, -7], [-7, 0.5, 7]
+  ];
+  
+  boxPositions.forEach(([x, y, z]) => {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xff4444 })
+    );
+    box.position.set(x, y, z);
+    box.castShadow = true;
+    box.receiveShadow = true;
+    scene.add(box);
+    
+    collisionObjects.push({
+      object: box,
+      width: 1,
+      height: 1,
+      depth: 1,
+      type: 'box'
+    });
   });
 }
 
@@ -221,7 +326,8 @@ function createCube(color) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const material = new THREE.MeshStandardMaterial({ 
     color: color,
-    roughness: 0.7
+    roughness: 0.7,
+    metalness: 0.3
   });
   const cube = new THREE.Mesh(geometry, material);
   
@@ -229,7 +335,7 @@ function createCube(color) {
   const edges = new THREE.EdgesGeometry(geometry);
   const line = new THREE.LineSegments(
     edges, 
-    new THREE.LineBasicMaterial({ color: 0x000000 })
+    new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
   );
   cube.add(line);
   
@@ -284,7 +390,7 @@ function setupEventListeners() {
     }
   });
 
-  // Mouse look
+  // Fixed mouse movement - listen on the whole document
   document.addEventListener('mousemove', (event) => {
     if (document.pointerLockElement === document.body) {
       mouseX = event.movementX;
@@ -292,7 +398,7 @@ function setupEventListeners() {
     }
   });
 
-  // Pointer lock
+  // Pointer lock on canvas click
   renderer.domElement.addEventListener('click', () => {
     if (!document.pointerLockElement) {
       renderer.domElement.requestPointerLock();
@@ -317,36 +423,99 @@ function setupEventListeners() {
 
 function jump() {
   if (onGround) {
-    velocity.y = 0.15;
+    velocity.y = JUMP_FORCE;
     onGround = false;
   }
 }
 
+function checkCollisions() {
+  const playerBox = new THREE.Box3().setFromObject(localCube);
+  const playerCenter = localCube.position.clone();
+  const playerRadius = 0.5; // Approximate radius for sphere collision
+  
+  onGround = false;
+  
+  for (const collider of collisionObjects) {
+    if (collider.isGround) {
+      // Ground collision
+      if (localCube.position.y <= 0.5) {
+        localCube.position.y = 0.5;
+        velocity.y = 0;
+        onGround = true;
+      }
+      continue;
+    }
+    
+    if (collider.type === 'cylinder') {
+      // Cylinder collision (trees)
+      const treePos = collider.object.position;
+      const horizontalDist = Math.sqrt(
+        (playerCenter.x - treePos.x) ** 2 + 
+        (playerCenter.z - treePos.z) ** 2
+      );
+      
+      if (horizontalDist < playerRadius + collider.radius) {
+        // Collision detected - push player away
+        const pushDir = new THREE.Vector3(
+          playerCenter.x - treePos.x,
+          0,
+          playerCenter.z - treePos.z
+        ).normalize();
+        
+        const pushDistance = (playerRadius + collider.radius) - horizontalDist;
+        localCube.position.add(pushDir.multiplyScalar(pushDistance * 1.1));
+      }
+    }
+    else if (collider.type === 'box') {
+      // Box collision
+      const box = new THREE.Box3().setFromObject(collider.object);
+      
+      if (playerBox.intersectsBox(box)) {
+        // Simple collision response - push player to nearest side
+        const boxCenter = collider.object.position.clone();
+        const pushDir = playerCenter.clone().sub(boxCenter);
+        pushDir.y = 0; // Only push horizontally
+        pushDir.normalize();
+        
+        localCube.position.add(pushDir.multiplyScalar(0.1));
+      }
+    }
+  }
+}
+
 function updateMovement() {
-  const speed = 0.1;
+  // Calculate movement direction based on camera orientation
   const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   const right = new THREE.Vector3(forward.z, 0, -forward.x);
-
-  if (keys.w) localCube.position.addScaledVector(forward, speed);
-  if (keys.s) localCube.position.addScaledVector(forward, -speed);
-  if (keys.a) localCube.position.addScaledVector(right, -speed);
-  if (keys.d) localCube.position.addScaledVector(right, speed);
-
-  // Gravity
-  velocity.y -= 0.015;
-  localCube.position.y += velocity.y;
-
-  // Ground collision
-  if (localCube.position.y <= 0.5) {
-    localCube.position.y = 0.5;
-    velocity.y = 0;
-    onGround = true;
+  
+  // Apply movement with corrected A/D keys
+  const moveVector = new THREE.Vector3();
+  
+  if (keys.w) moveVector.add(forward);
+  if (keys.s) moveVector.add(forward.clone().negate());
+  if (keys.a) moveVector.add(right.clone().negate()); // Fixed: A moves left
+  if (keys.d) moveVector.add(right); // Fixed: D moves right
+  
+  if (moveVector.length() > 0) {
+    moveVector.normalize().multiplyScalar(MOVE_SPEED);
+    localCube.position.add(moveVector);
   }
-
-  // Update label
+  
+  // Apply gravity
+  velocity.y += GRAVITY;
+  localCube.position.y += velocity.y;
+  
+  // Check collisions
+  checkCollisions();
+  
+  // Apply friction to horizontal movement
+  velocity.x *= FRICTION;
+  velocity.z *= FRICTION;
+  
+  // Update label position and orientation
   localLabel.position.copy(localCube.position).add(new THREE.Vector3(0, 2.2, 0));
   localLabel.lookAt(camera.position);
-
+  
   // Update UI coordinates
   const coordsElement = document.getElementById('coords');
   if (coordsElement) {
@@ -356,19 +525,23 @@ function updateMovement() {
 }
 
 function updateCamera() {
+  // Update camera rotation based on mouse movement
   yaw -= mouseX * 0.002;
   pitch -= mouseY * 0.002;
   pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-
+  
+  // Calculate camera offset
   const offset = new THREE.Vector3(
     Math.sin(yaw) * Math.cos(pitch) * cameraDistance,
     Math.sin(pitch) * cameraDistance + 2,
     Math.cos(yaw) * Math.cos(pitch) * cameraDistance
   );
-
+  
+  // Update camera position and orientation
   camera.position.copy(localCube.position).add(offset);
   camera.lookAt(localCube.position);
-
+  
+  // Reset mouse movement
   mouseX = 0;
   mouseY = 0;
 }
