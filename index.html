@@ -11,16 +11,51 @@
       overflow: hidden; 
       font-family: 'Arial', sans-serif;
       background: #000;
+      color: white;
     }
     
     #loading {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-size: 20px;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+    
+    #loading h2 {
+      margin-bottom: 20px;
+      color: #00ffea;
+      font-size: 24px;
+    }
+    
+    .loading-bar-container {
+      width: 300px;
+      height: 20px;
+      background: #333;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #00ffea;
+    }
+    
+    .loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00ffea, #0099ff);
+      width: 0%;
+      transition: width 0.3s ease;
+      border-radius: 8px;
+    }
+    
+    #loading-text {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #ccc;
     }
     
     #ui {
@@ -33,6 +68,7 @@
       background: rgba(0, 0, 0, 0.8);
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.2);
+      display: none;
     }
     
     #coords {
@@ -47,14 +83,37 @@
       width: 100vw;
       height: 100vh;
     }
+    
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: center;
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <div id="loading">Loading Cube Activity...</div>
+  <div id="loading">
+    <h2>Loading Cube Activity</h2>
+    <div class="loading-bar-container">
+      <div class="loading-bar" id="loading-bar"></div>
+    </div>
+    <div id="loading-text">Initializing Discord SDK...</div>
+  </div>
   
-  <div id="ui" style="display: none;">
+  <div id="ui">
     <label>Color: <input type="color" id="colorPicker" value="#00ffea"></label>
     <div id="coords">x:0.0 y:0.0 z:0.0</div>
+  </div>
+
+  <div class="controls" id="controls">
+    WASD: Move | Mouse: Look | Space: Jump | Click: Lock Mouse
   </div>
 
   <script type="module" src="main.js"></script>
