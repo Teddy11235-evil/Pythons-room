@@ -2,7 +2,7 @@ import { DiscordSDK } from "https://cdn.jsdelivr.net/npm/@discord/embedded-app-s
 import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
 const APP_ID = "1444052119794487326";
-const discord = new DiscordSDK(APP_ID);
+let discord;
 
 // Game state
 let scene, camera, renderer;
@@ -19,75 +19,95 @@ let authUser = { id: "local", username: "Player" };
 
 // Loading progress
 let loadingProgress = 0;
-const loadingSteps = {
-  DISCORD_SDK: 10,
-  AUTHENTICATION: 20,
-  SCENE_SETUP: 40,
-  LIGHTING: 60,
-  PLAYER_SETUP: 80,
-  COMPLETE: 100
-};
 
 function updateLoadingBar(progress, text) {
   const loadingBar = document.getElementById('loading-bar');
   const loadingText = document.getElementById('loading-text');
   
-  loadingBar.style.width = `${progress}%`;
-  loadingText.textContent = text;
+  if (loadingBar && loadingText) {
+    loadingBar.style.width = `${progress}%`;
+    loadingText.textContent = text;
+  }
   
   console.log(`Loading: ${progress}% - ${text}`);
 }
 
 async function setupDiscord() {
   try {
-    updateLoadingBar(loadingSteps.DISCORD_SDK, "Connecting to Discord...");
+    updateLoadingBar(10, "Initializing Discord SDK...");
     
-    await discord.ready();
-    console.log("Discord SDK is ready!");
+    // Check if we're in Discord
+    if (window.DiscordNative) {
+      discord = new DiscordSDK(APP_ID);
+      
+      updateLoadingBar(20, "Waiting for Discord ready...");
+      await discord.ready();
+      console.log("Discord SDK is ready!");
+      
+      updateLoadingBar(40, "Authenticating with Discord...");
+      const { user } = await discord.authenticate();
+      authUser = user;
+      console.log("Authenticated as:", user.username);
+    } else {
+      // Not in Discord - use local mode
+      console.log("Not in Discord, running in local mode");
+      authUser = { 
+        id: "local-" + Math.random().toString(36).substr(2, 9),
+        username: "LocalPlayer"
+      };
+    }
     
-    updateLoadingBar(loadingSteps.AUTHENTICATION, "Authenticating user...");
-    
-    const { user } = await discord.authenticate();
-    authUser = user;
-    console.log("Authenticated as:", user.username);
-    
-    updateLoadingBar(loadingSteps.SCENE_SETUP, "Initializing game world...");
-    
+    updateLoadingBar(60, "Initializing game world...");
     await initGame();
+    
+    updateLoadingBar(80, "Setting up controls...");
     setupEventListeners();
     
-    updateLoadingBar(loadingSteps.COMPLETE, "Ready! Loading complete.");
+    updateLoadingBar(100, "Ready! Starting game...");
     
-    // Hide loading screen with fade out
+    // Hide loading screen
     setTimeout(() => {
       const loadingScreen = document.getElementById('loading');
-      loadingScreen.style.opacity = '0';
-      setTimeout(() => {
-        loadingScreen.style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        document.getElementById('controls').style.display = 'block';
-      }, 500);
-    }, 500);
+      if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+          const ui = document.getElementById('ui');
+          const controls = document.getElementById('controls');
+          if (ui) ui.style.display = 'block';
+          if (controls) controls.style.display = 'block';
+        }, 500);
+      }
+    }, 1000);
     
   } catch (error) {
-    console.error("Discord setup failed:", error);
-    // Fallback for testing
-    authUser = { id: "local-test", username: "TestPlayer" };
-    updateLoadingBar(50, "Running in local test mode...");
+    console.error("Setup failed:", error);
+    
+    // Fallback - start game anyway
+    updateLoadingBar(50, "Fallback mode - starting game locally...");
+    
+    authUser = { 
+      id: "fallback-" + Math.random().toString(36).substr(2, 9),
+      username: "FallbackPlayer"
+    };
     
     await initGame();
     setupEventListeners();
     
-    updateLoadingBar(100, "Ready! (Local Mode)");
+    updateLoadingBar(100, "Ready! (Local Fallback Mode)");
     
     setTimeout(() => {
       const loadingScreen = document.getElementById('loading');
-      loadingScreen.style.opacity = '0';
-      setTimeout(() => {
-        loadingScreen.style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        document.getElementById('controls').style.display = 'block';
-      }, 500);
+      if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+          const ui = document.getElementById('ui');
+          const controls = document.getElementById('controls');
+          if (ui) ui.style.display = 'block';
+          if (controls) controls.style.display = 'block';
+        }, 500);
+      }
     }, 1000);
   }
 }
@@ -95,25 +115,18 @@ async function setupDiscord() {
 async function initGame() {
   console.log("Initializing game...");
   
-  updateLoadingBar(loadingSteps.SCENE_SETUP, "Creating scene...");
-  
   // Scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB); // Sky blue
+  scene.background = new THREE.Color(0x87CEEB);
   scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
-  
-  updateLoadingBar(loadingSteps.SCENE_SETUP + 5, "Setting up camera...");
   
   // Camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   
-  updateLoadingBar(loadingSteps.SCENE_SETUP + 10, "Initializing renderer...");
-  
   // Renderer
   renderer = new THREE.WebGLRenderer({ 
     antialias: true,
-    alpha: false,
-    powerPreference: "high-performance"
+    alpha: false
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -131,14 +144,11 @@ async function initGame() {
   renderer.domElement.tabIndex = 1;
   renderer.domElement.style.outline = 'none';
   
-  updateLoadingBar(loadingSteps.LIGHTING, "Setting up lighting...");
-  
   // Ground
   const groundGeometry = new THREE.PlaneGeometry(200, 200);
   const groundMaterial = new THREE.MeshStandardMaterial({ 
     color: 0x3a7e3a,
-    roughness: 0.8,
-    metalness: 0.2
+    roughness: 0.8
   });
   const ground = new THREE.Mesh(groundGeometry, groundMaterial);
   ground.rotation.x = -Math.PI / 2;
@@ -158,17 +168,7 @@ async function initGame() {
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
   directionalLight.position.set(50, 100, 50);
   directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 2048;
-  directionalLight.shadow.mapSize.height = 2048;
-  directionalLight.shadow.camera.near = 0.5;
-  directionalLight.shadow.camera.far = 500;
-  directionalLight.shadow.camera.left = -100;
-  directionalLight.shadow.camera.right = 100;
-  directionalLight.shadow.camera.top = 100;
-  directionalLight.shadow.camera.bottom = -100;
   scene.add(directionalLight);
-  
-  updateLoadingBar(loadingSteps.PLAYER_SETUP, "Creating player...");
   
   // Create player
   localCube = createCube("#00ffea");
@@ -180,25 +180,22 @@ async function initGame() {
   localLabel = createTextLabel(authUser.username);
   scene.add(localLabel);
   
-  updateLoadingBar(loadingSteps.PLAYER_SETUP + 5, "Adding environment...");
-  
-  // Add some environment objects
+  // Add environment
   createEnvironment();
   
   console.log("Game initialized successfully");
   
-  // Start animation loop
+  // Start animation
   animate();
   
-  // Handle window resize
+  // Handle resize
   window.addEventListener('resize', onWindowResize);
 }
 
 function createEnvironment() {
-  // Add some trees/obstacles
+  // Add some trees
   const treePositions = [
-    [10, 0, 10], [-10, 0, 15], [15, 0, -8], [-12, 0, -10],
-    [20, 0, 5], [-5, 0, 20], [8, 0, -15], [-18, 0, 8]
+    [10, 0, 10], [-10, 0, 15], [15, 0, -8], [-12, 0, -10]
   ];
   
   treePositions.forEach(([x, y, z]) => {
@@ -218,23 +215,13 @@ function createEnvironment() {
     treeTop.castShadow = true;
     scene.add(treeTop);
   });
-  
-  // Add a central platform
-  const platform = new THREE.Mesh(
-    new THREE.CylinderGeometry(5, 5, 0.5, 16),
-    new THREE.MeshStandardMaterial({ color: 0x888888 })
-  );
-  platform.position.set(0, 0.25, 0);
-  platform.receiveShadow = true;
-  scene.add(platform);
 }
 
 function createCube(color) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const material = new THREE.MeshStandardMaterial({ 
     color: color,
-    roughness: 0.7,
-    metalness: 0.3
+    roughness: 0.7
   });
   const cube = new THREE.Mesh(geometry, material);
   
@@ -265,11 +252,6 @@ function createTextLabel(text) {
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText(text, canvas.width / 2, canvas.height / 2);
-  
-  // Border
-  context.strokeStyle = '#00ffea';
-  context.lineWidth = 2;
-  context.strokeRect(0, 0, canvas.width, canvas.height);
   
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({ 
@@ -318,10 +300,12 @@ function setupEventListeners() {
   });
 
   // Color picker
-  document.getElementById('colorPicker').addEventListener('input', (event) => {
-    localCube.material.color.set(event.target.value);
-    sendPlayerState();
-  });
+  const colorPicker = document.getElementById('colorPicker');
+  if (colorPicker) {
+    colorPicker.addEventListener('input', (event) => {
+      localCube.material.color.set(event.target.value);
+    });
+  }
 
   // Mouse wheel for zoom
   document.addEventListener('wheel', (event) => {
@@ -364,8 +348,11 @@ function updateMovement() {
   localLabel.lookAt(camera.position);
 
   // Update UI coordinates
-  document.getElementById('coords').textContent = 
-    `x:${localCube.position.x.toFixed(1)} y:${localCube.position.y.toFixed(1)} z:${localCube.position.z.toFixed(1)}`;
+  const coordsElement = document.getElementById('coords');
+  if (coordsElement) {
+    coordsElement.textContent = 
+      `x:${localCube.position.x.toFixed(1)} y:${localCube.position.y.toFixed(1)} z:${localCube.position.z.toFixed(1)}`;
+  }
 }
 
 function updateCamera() {
@@ -386,11 +373,6 @@ function updateCamera() {
   mouseY = 0;
 }
 
-function sendPlayerState() {
-  // Multiplayer sync would go here
-  console.log("Player state updated");
-}
-
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -406,5 +388,14 @@ function animate() {
   renderer.render(scene, camera);
 }
 
+// Add timeout fallback
+setTimeout(() => {
+  const loadingText = document.getElementById('loading-text');
+  if (loadingText && loadingText.textContent.includes("Initializing Discord SDK")) {
+    console.log("Discord SDK timeout - forcing fallback mode");
+    setupDiscord().catch(console.error);
+  }
+}, 5000);
+
 // Start the application
-setupDiscord();
+setupDiscord().catch(console.error);
