@@ -7,9 +7,20 @@
   <style>
     body { 
       margin: 0; 
+      padding: 0;
       overflow: hidden; 
-      font-family: sans-serif;
-      background: #222;
+      font-family: 'Arial', sans-serif;
+      background: #000;
+    }
+    
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 20px;
+      z-index: 1000;
     }
     
     #ui {
@@ -18,30 +29,30 @@
       left: 10px;
       color: white;
       z-index: 100;
-      padding: 8px;
-      background: rgba(0,0,0,0.6);
-      border-radius: 8px;
-      backdrop-filter: blur(5px);
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     #coords {
       margin-top: 8px;
       font-size: 12px;
-      color: #ccc;
-    }
-    
-    #colorPicker {
-      vertical-align: middle;
-      margin-left: 5px;
+      color: #00ffea;
+      font-family: 'Courier New', monospace;
     }
     
     canvas {
       display: block;
+      width: 100vw;
+      height: 100vh;
     }
   </style>
 </head>
 <body>
-  <div id="ui">
+  <div id="loading">Loading Cube Activity...</div>
+  
+  <div id="ui" style="display: none;">
     <label>Color: <input type="color" id="colorPicker" value="#00ffea"></label>
     <div id="coords">x:0.0 y:0.0 z:0.0</div>
   </div>
