@@ -17,70 +17,126 @@ let mouseX = 0, mouseY = 0;
 let cameraDistance = 10;
 let authUser = { id: "local", username: "Player" };
 
+// Loading progress
+let loadingProgress = 0;
+const loadingSteps = {
+  DISCORD_SDK: 10,
+  AUTHENTICATION: 20,
+  SCENE_SETUP: 40,
+  LIGHTING: 60,
+  PLAYER_SETUP: 80,
+  COMPLETE: 100
+};
+
+function updateLoadingBar(progress, text) {
+  const loadingBar = document.getElementById('loading-bar');
+  const loadingText = document.getElementById('loading-text');
+  
+  loadingBar.style.width = `${progress}%`;
+  loadingText.textContent = text;
+  
+  console.log(`Loading: ${progress}% - ${text}`);
+}
+
 async function setupDiscord() {
   try {
+    updateLoadingBar(loadingSteps.DISCORD_SDK, "Connecting to Discord...");
+    
     await discord.ready();
     console.log("Discord SDK is ready!");
+    
+    updateLoadingBar(loadingSteps.AUTHENTICATION, "Authenticating user...");
     
     const { user } = await discord.authenticate();
     authUser = user;
     console.log("Authenticated as:", user.username);
     
-    // Hide loading, show UI
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('ui').style.display = 'block';
+    updateLoadingBar(loadingSteps.SCENE_SETUP, "Initializing game world...");
     
-    initGame();
+    await initGame();
     setupEventListeners();
+    
+    updateLoadingBar(loadingSteps.COMPLETE, "Ready! Loading complete.");
+    
+    // Hide loading screen with fade out
+    setTimeout(() => {
+      const loadingScreen = document.getElementById('loading');
+      loadingScreen.style.opacity = '0';
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        document.getElementById('controls').style.display = 'block';
+      }, 500);
+    }, 500);
     
   } catch (error) {
     console.error("Discord setup failed:", error);
     // Fallback for testing
     authUser = { id: "local-test", username: "TestPlayer" };
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('ui').style.display = 'block';
-    initGame();
+    updateLoadingBar(50, "Running in local test mode...");
+    
+    await initGame();
     setupEventListeners();
+    
+    updateLoadingBar(100, "Ready! (Local Mode)");
+    
+    setTimeout(() => {
+      const loadingScreen = document.getElementById('loading');
+      loadingScreen.style.opacity = '0';
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        document.getElementById('controls').style.display = 'block';
+      }, 500);
+    }, 1000);
   }
 }
 
-function initGame() {
+async function initGame() {
   console.log("Initializing game...");
   
-  // Scene with brighter background for testing
+  updateLoadingBar(loadingSteps.SCENE_SETUP, "Creating scene...");
+  
+  // Scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB); // Sky blue instead of dark gray
+  scene.background = new THREE.Color(0x87CEEB); // Sky blue
+  scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+  
+  updateLoadingBar(loadingSteps.SCENE_SETUP + 5, "Setting up camera...");
   
   // Camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 5, 10);
   
-  // Renderer with better configuration
+  updateLoadingBar(loadingSteps.SCENE_SETUP + 10, "Initializing renderer...");
+  
+  // Renderer
   renderer = new THREE.WebGLRenderer({ 
     antialias: true,
     alpha: false,
     powerPreference: "high-performance"
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Prevent performance issues
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   
-  // Clear any existing canvas and add new one
+  // Clear any existing canvas
   const existingCanvas = document.querySelector('canvas');
   if (existingCanvas) {
     document.body.removeChild(existingCanvas);
   }
   document.body.appendChild(renderer.domElement);
   
-  // Make canvas focusable for pointer lock
+  // Make canvas focusable
   renderer.domElement.tabIndex = 1;
   renderer.domElement.style.outline = 'none';
   
-  // Create a more visible ground
-  const groundGeometry = new THREE.PlaneGeometry(100, 100);
+  updateLoadingBar(loadingSteps.LIGHTING, "Setting up lighting...");
+  
+  // Ground
+  const groundGeometry = new THREE.PlaneGeometry(200, 200);
   const groundMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x3a7e3a, // Green ground
+    color: 0x3a7e3a,
     roughness: 0.8,
     metalness: 0.2
   });
@@ -89,57 +145,88 @@ function initGame() {
   ground.receiveShadow = true;
   scene.add(ground);
   
-  // Add a grid helper to see the ground better
-  const gridHelper = new THREE.GridHelper(100, 20, 0x000000, 0x000000);
-  gridHelper.material.opacity = 0.2;
+  // Grid helper
+  const gridHelper = new THREE.GridHelper(200, 50, 0x000000, 0x000000);
+  gridHelper.material.opacity = 0.1;
   gridHelper.material.transparent = true;
   scene.add(gridHelper);
   
-  // Better lighting
+  // Lighting
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(10, 20, 10);
+  directionalLight.position.set(50, 100, 50);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.width = 2048;
   directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.near = 0.5;
+  directionalLight.shadow.camera.far = 500;
+  directionalLight.shadow.camera.left = -100;
+  directionalLight.shadow.camera.right = 100;
+  directionalLight.shadow.camera.top = 100;
+  directionalLight.shadow.camera.bottom = -100;
   scene.add(directionalLight);
   
-  // Create player cube with brighter color
+  updateLoadingBar(loadingSteps.PLAYER_SETUP, "Creating player...");
+  
+  // Create player
   localCube = createCube("#00ffea");
   localCube.castShadow = true;
   localCube.position.set(0, 1, 0);
   scene.add(localCube);
   
-  // Create player label
+  // Player label
   localLabel = createTextLabel(authUser.username);
   scene.add(localLabel);
   
-  // Add some test objects to verify rendering
-  const testCube = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 2, 2),
-    new THREE.MeshStandardMaterial({ color: 0xff0000 })
-  );
-  testCube.position.set(5, 1, 0);
-  testCube.castShadow = true;
-  scene.add(testCube);
+  updateLoadingBar(loadingSteps.PLAYER_SETUP + 5, "Adding environment...");
   
-  const testCube2 = new THREE.Mesh(
-    new THREE.BoxGeometry(2, 2, 2),
-    new THREE.MeshStandardMaterial({ color: 0x0000ff })
-  );
-  testCube2.position.set(-5, 1, 0);
-  testCube2.castShadow = true;
-  scene.add(testCube2);
+  // Add some environment objects
+  createEnvironment();
   
   console.log("Game initialized successfully");
   
-  // Start animation
+  // Start animation loop
   animate();
   
-  // Handle resize
+  // Handle window resize
   window.addEventListener('resize', onWindowResize);
+}
+
+function createEnvironment() {
+  // Add some trees/obstacles
+  const treePositions = [
+    [10, 0, 10], [-10, 0, 15], [15, 0, -8], [-12, 0, -10],
+    [20, 0, 5], [-5, 0, 20], [8, 0, -15], [-18, 0, 8]
+  ];
+  
+  treePositions.forEach(([x, y, z]) => {
+    const treeTrunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.4, 2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+    );
+    treeTrunk.position.set(x, 1, z);
+    treeTrunk.castShadow = true;
+    scene.add(treeTrunk);
+    
+    const treeTop = new THREE.Mesh(
+      new THREE.SphereGeometry(1.5, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x228B22 })
+    );
+    treeTop.position.set(x, 3, z);
+    treeTop.castShadow = true;
+    scene.add(treeTop);
+  });
+  
+  // Add a central platform
+  const platform = new THREE.Mesh(
+    new THREE.CylinderGeometry(5, 5, 0.5, 16),
+    new THREE.MeshStandardMaterial({ color: 0x888888 })
+  );
+  platform.position.set(0, 0.25, 0);
+  platform.receiveShadow = true;
+  scene.add(platform);
 }
 
 function createCube(color) {
@@ -155,7 +242,7 @@ function createCube(color) {
   const edges = new THREE.EdgesGeometry(geometry);
   const line = new THREE.LineSegments(
     edges, 
-    new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
+    new THREE.LineBasicMaterial({ color: 0x000000 })
   );
   cube.add(line);
   
@@ -173,7 +260,7 @@ function createTextLabel(text) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   
   // Text
-  context.font = 'bold 24px Arial';
+  context.font = 'bold 20px Arial';
   context.fillStyle = '#00ffea';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
@@ -215,7 +302,7 @@ function setupEventListeners() {
     }
   });
 
-  // Mouse look with pointer lock
+  // Mouse look
   document.addEventListener('mousemove', (event) => {
     if (document.pointerLockElement === document.body) {
       mouseX = event.movementX;
@@ -223,7 +310,7 @@ function setupEventListeners() {
     }
   });
 
-  // Pointer lock on canvas click
+  // Pointer lock
   renderer.domElement.addEventListener('click', () => {
     if (!document.pointerLockElement) {
       renderer.domElement.requestPointerLock();
@@ -273,7 +360,7 @@ function updateMovement() {
   }
 
   // Update label
-  localLabel.position.copy(localCube.position).add(new THREE.Vector3(0, 2, 0));
+  localLabel.position.copy(localCube.position).add(new THREE.Vector3(0, 2.2, 0));
   localLabel.lookAt(camera.position);
 
   // Update UI coordinates
