@@ -3,55 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <title>Cube Activity</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; overflow: hidden; cursor: none; }
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      font-family: sans-serif;
+      background: #222;
+    }
+    
     #ui {
       position: absolute;
       top: 10px;
       left: 10px;
-      z-index: 100;
-      background: rgba(0,0,0,0.5);
-      padding: 8px;
-      border-radius: 4px;
       color: white;
-      font-family: sans-serif;
+      z-index: 100;
+      padding: 8px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 8px;
+      backdrop-filter: blur(5px);
     }
+    
     #coords {
       margin-top: 8px;
-      color: #fff;
+      font-size: 12px;
+      color: #ccc;
+    }
+    
+    #colorPicker {
+      vertical-align: middle;
+      margin-left: 5px;
+    }
+    
+    canvas {
+      display: block;
     }
   </style>
 </head>
 <body>
   <div id="ui">
-    <label>Color:</label>
-    <input type="color" id="colorPicker" value="#00ffea">
-    <div id="coords">x:0 y:0 z:0</div>
+    <label>Color: <input type="color" id="colorPicker" value="#00ffea"></label>
+    <div id="coords">x:0.0 y:0.0 z:0.0</div>
   </div>
 
-  <script type="module">
-    import { DiscordSDK } from "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@latest/+esm";
-
-    const APP_ID = "1444052119794487326";
-    const discord = new DiscordSDK(APP_ID);
-
-    async function initDiscord() {
-      await discord.ready();
-      console.log("Discord SDK ready");
-      startGame(discord);
-    }
-
-    initDiscord().catch(err => console.error("Failed to initialize Discord SDK:", err));
-
-    // Pointer lock for mouse
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
-  </script>
-
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script src="main.js" type="module"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
-
-
